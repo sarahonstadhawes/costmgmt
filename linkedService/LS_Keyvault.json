@@ -1,0 +1,11 @@
+{
+	"name": "LS_Keyvault",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://costmgmtvault.vault.azure.net/"
+		}
+	}
+}

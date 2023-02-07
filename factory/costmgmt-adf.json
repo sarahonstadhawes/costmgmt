@@ -1,0 +1,9 @@
+{
+	"name": "costmgmt-adf",
+	"location": "westus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "247e77dd-8b89-4ac6-88ce-1ef190d9eccd",
+		"tenantId": "6c637512-c417-4e78-9d62-b61258e4b619"
+	}
+}

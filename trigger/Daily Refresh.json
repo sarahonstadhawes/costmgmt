@@ -1,0 +1,37 @@
+{
+	"name": "Daily Refresh",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "Check_Refined_Folder",
+					"type": "PipelineReference"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Day",
+				"interval": 1,
+				"startTime": "2022-12-13T23:41:00",
+				"timeZone": "Mountain Standard Time",
+				"schedule": {
+					"minutes": [
+						30,
+						45,
+						0,
+						15
+					],
+					"hours": [
+						8,
+						9,
+						10
+					]
+				}
+			}
+		}
+	}
+}

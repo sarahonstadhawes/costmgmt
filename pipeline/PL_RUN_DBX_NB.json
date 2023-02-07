@@ -1,0 +1,337 @@
+{
+	"name": "PL_RUN_DBX_NB",
+	"properties": {
+		"description": "run a Databricks notebook for cost data",
+		"activities": [
+			{
+				"name": "Set Variable for CM",
+				"description": "Current month variable",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "startofcurrentmonth",
+					"value": {
+						"value": "@formatDateTime(utcnow(), 'yyyyMM')\n",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set Variable for CD",
+				"description": "Current day variable",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "currentdate",
+					"value": {
+						"value": "@formatdatetime(utcnow(), 'MM/dd/yyyy')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "SubfolderNames",
+				"description": "Gets the Month Folder Names",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "Set Variable for CM",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set Variable for CD",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "MonthFolders",
+						"type": "DatasetReference"
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "FolderNamesLoop",
+				"description": "Loop through the month folder names and set a variable to the current month folder name",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "SubfolderNames",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('SubfolderNames').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "IfCurrentMonthName",
+							"description": "Check if the folder name is the same as the CM variable",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@contains(string(item().name),variables('startofcurrentmonth'))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "CMFolder",
+										"description": "Current Month Folder",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "CMFolder",
+											"value": {
+												"value": "@item().name",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "DailyFiles",
+				"description": "Goes through the daily files for the current month",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "FolderNamesLoop",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DailyFiles",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": {
+								"value": "@variables('CMFolder')",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "FilesModifiedDate",
+				"description": "Loops through each file and saves the last modified date for each file",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "DailyFiles",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('DailyFiles').output.childItems",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "FilesModified",
+							"description": "Checks when each file has been modified",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "ModifiedDateOfFiles",
+									"type": "DatasetReference",
+									"parameters": {
+										"Folder": {
+											"value": "@variables('CMFolder')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"lastModified"
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							}
+						},
+						{
+							"name": "ModifiedDates",
+							"description": "Adds files modified dates to array",
+							"type": "AppendVariable",
+							"dependsOn": [
+								{
+									"activity": "FilesModified",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "DailyFilesModified",
+								"value": {
+									"value": "@formatdatetime(activity('FilesModified').output.lastModified, 'MM/dd/yyyy')\n",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "IfFileCreatedToday",
+				"description": "Checks if a file has been created today and runs the databricks notebook",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "FilesModifiedDate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@contains(variables('DailyFilesModified'), variables('currentdate'))\n",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Run DataAnalysis Notebook",
+							"type": "DatabricksNotebook",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebookPath": "/DataAnalysis"
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_Databricks_CostData",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"startofcurrentmonth": {
+				"type": "String"
+			},
+			"currentdate": {
+				"type": "String"
+			},
+			"CMFolder": {
+				"type": "String"
+			},
+			"DailyFilesModified": {
+				"type": "Array"
+			},
+			"RefinedDataFiles": {
+				"type": "Array"
+			},
+			"test": {
+				"type": "String"
+			},
+			"currentday": {
+				"type": "String"
+			},
+			"RefinedDataList": {
+				"type": "Array"
+			},
+			"refineddatafile": {
+				"type": "String"
+			},
+			"filecreatedtoday": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-02-06T23:08:16Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

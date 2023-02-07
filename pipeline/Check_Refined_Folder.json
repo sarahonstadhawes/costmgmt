@@ -1,0 +1,179 @@
+{
+	"name": "Check_Refined_Folder",
+	"properties": {
+		"activities": [
+			{
+				"name": "currentday",
+				"description": "Current day variable",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "currentday",
+					"value": {
+						"value": "@formatdatetime(utcnow(), 'yyyy-MM-dd')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "RefinedData",
+				"description": "Goes into the refined folder",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "currentday",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "RefinedData",
+						"type": "DatasetReference"
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "RefinedFilesList",
+				"description": "Loops through each of the files in the refined folder and checks if a file has been made today",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "RefinedData",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('RefinedData').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "IfFileCreatedToday",
+							"description": "Checks to see if a refined file has been made or not for today",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "RefinedDataFilename",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@contains(variables('refineddatafile'),variables('currentday'))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "FileCreatedToday",
+										"description": "States that a file has been successfully made today",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "filecreatedtoday",
+											"value": "true"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "RefinedDataFilename",
+							"description": "Sets variable as the name of the file",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "refineddatafile",
+								"value": {
+									"value": "@item().name",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "IfRefinedFileCreated",
+				"description": "If a refined file has been created today do nothing and if it hasn't run other pipeline",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "RefinedFilesList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(variables('filecreatedtoday'), 'true')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Execute PL_RUN_DBX_NB",
+							"description": "Run databricks pipeline",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_RUN_DBX_NB",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true
+							}
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"currentday": {
+				"type": "String"
+			},
+			"refineddatafile": {
+				"type": "String"
+			},
+			"filecreatedtoday": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-01-25T23:16:54Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
