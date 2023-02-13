@@ -5,7 +5,7 @@
 		"activities": [
 			{
 				"name": "Set Variable for CM",
-				"description": "Current month variable",
+				"description": "Current month variable - yay",
 				"type": "SetVariable",
 				"dependsOn": [],
 				"userProperties": [],
